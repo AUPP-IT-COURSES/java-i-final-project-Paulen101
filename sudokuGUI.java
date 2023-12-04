@@ -4,13 +4,17 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
+import java.util.Random;
 
 public class sudokuGUI extends Application {
-    private TextField[][] grid;
+    private TextField[][] grid = new TextField[9][9];
+    private SudokuSolver sudokuSolver = new SudokuSolver();
 
     public static void main(String[] args) {
         launch(args);
@@ -20,31 +24,52 @@ public class sudokuGUI extends Application {
     public void start(Stage primaryStage) {
         primaryStage.setTitle("Sudoku Game");
 
-        BorderPane borderPane = new BorderPane();
-        borderPane.setCenter(createGrid());
-        borderPane.setBottom(createButtons(primaryStage));
+        GridPane sudokuGrid = createSudokuGrid();
+        Button solveButton = new Button("Solve");
+        solveButton.setOnAction(e -> solveSudoku());
 
-        Scene scene = new Scene(borderPane, 400, 450);
+        Button checkButton = new Button("Check Answer");
+        checkButton.setOnAction(e -> checkSudoku());
+
+        Button newGameButton = new Button("New Game");
+        newGameButton.setOnAction(e -> generateRandomPuzzle());
+
+        HBox buttonsHBox = new HBox(10);
+        buttonsHBox.setAlignment(Pos.CENTER);
+        buttonsHBox.getChildren().addAll(solveButton, checkButton, newGameButton);
+
+        VBox root = new VBox(10);
+        root.setAlignment(Pos.CENTER);
+        root.setPadding(new Insets(10));
+        root.getChildren().addAll(sudokuGrid, buttonsHBox);
+
+        Scene scene = new Scene(root, 400, 500);
         primaryStage.setScene(scene);
+
+        generateRandomPuzzle(); // Generate a random puzzle on startup
 
         primaryStage.show();
     }
 
-    private GridPane createGrid() {
+    private GridPane createSudokuGrid() {
         GridPane gridPane = new GridPane();
         gridPane.setAlignment(Pos.CENTER);
-        gridPane.setPadding(new Insets(10));
         gridPane.setHgap(5);
         gridPane.setVgap(5);
-
-        grid = new TextField[9][9];
 
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
                 grid[i][j] = new TextField();
                 grid[i][j].setPrefSize(40, 40);
                 grid[i][j].setAlignment(Pos.CENTER);
-                grid[i][j].setStyle("-fx-font-size: 16;");
+                grid[i][j].setStyle("-fx-font-size: 16; -fx-border-color: #000000; -fx-border-width: " +
+                        (i % 3 == 0 ? 2 : 1) + " " + (j % 3 == 0 ? 2 : 1) + " 1 1;");
+
+                int subgridIndex = (i / 3) * 3 + (j / 3);
+                if (subgridIndex % 3 == 1) {
+                    grid[i][j].setStyle(grid[i][j].getStyle() + "-fx-background-color: #D3D3D3;");
+                }
+
                 gridPane.add(grid[i][j], j, i);
             }
         }
@@ -52,24 +77,9 @@ public class sudokuGUI extends Application {
         return gridPane;
     }
 
-    private HBox createButtons(Stage primaryStage) {
-        HBox hbox = new HBox(10);
-        hbox.setAlignment(Pos.CENTER);
+    private SudokuSolver sudokuSolver1 = new SudokuSolver();
 
-        Button solveButton = new Button("Solve");
-        solveButton.setOnAction(e -> solveSudokuFromGUI());
-        Button checkButton = new Button("Check");
-        checkButton.setOnAction(e -> checkSudoku());
-        Button clearButton = new Button("Clear");
-        clearButton.setOnAction(e -> clearGrid());
-        Button newGameButton = new Button("New Game");
-        newGameButton.setOnAction(e -> startNewGame());
-
-        hbox.getChildren().addAll(solveButton, checkButton, clearButton, newGameButton);
-        return hbox;
-    }
-
-    private void solveSudokuFromGUI() {
+    private void solveSudoku() {
         int[][] sudokuBoard = new int[9][9];
 
         // Populate the board with values from the GUI
@@ -84,8 +94,8 @@ public class sudokuGUI extends Application {
             }
         }
 
-        // Solve the Sudoku
-        if (sudoku.solveSudoku(sudokuBoard)) {
+        // Solve the Sudoku using the SudokuSolver class
+        if (sudokuSolver.solveSudoku(sudokuBoard)) {
             // Display the solution in the GUI
             for (int i = 0; i < 9; i++) {
                 for (int j = 0; j < 9; j++) {
@@ -94,9 +104,11 @@ public class sudokuGUI extends Application {
                 }
             }
         } else {
-            displayMessage("No solution exists.");
+            // Display an error message
+            System.out.println("No solution exists.");
         }
     }
+
 
     private void checkSudoku() {
         int[][] sudokuBoard = new int[9][9];
@@ -113,34 +125,50 @@ public class sudokuGUI extends Application {
             }
         }
 
-        // Check the correctness of the Sudoku
-        if (sudoku.solveSudoku(sudokuBoard)) {
-            displayMessage("Correct solution!");
+        // Check the correctness of the Sudoku using the SudokuSolver class
+        boolean isCorrect = sudokuSolver.solveSudoku(sudokuBoard);
+        
+        // Display the result in message box
+        showAlert(isCorrect);
+    }
+    
+    private void showAlert(boolean isCorrect) {
+        Alert alert = new Alert(AlertType.INFORMATION);
+        alert.setTitle("Sudoku Result");
+
+        if (isCorrect) {
+            alert.setHeaderText("Correct solution!");
+            alert.setContentText("Congratulations, you've solved the Sudoku puzzle!");
         } else {
-            displayMessage("Incorrect solution.");
+            alert.setHeaderText("Incorrect solution.");
+            alert.setContentText("Sorry, the solution is incorrect. Keep trying!");
         }
+
+        alert.showAndWait();
     }
 
-    private void clearGrid() {
-        // Clear all text fields in the grid
+
+    private void generateRandomPuzzle() {
+        int[][] randomPuzzle = generateRandomCompletedPuzzle();
+
+        // Hide some cells to create a puzzle
         for (int i = 0; i < 9; i++) {
             for (int j = 0; j < 9; j++) {
-                grid[i][j].clear();
-                grid[i][j].setStyle("-fx-text-fill: black;");
+                int randomNumber = new Random().nextInt(10);
+                if (randomNumber < 3) { // Adjust the threshold to control the number of hidden cells
+                    grid[i][j].setText("");
+                    grid[i][j].setEditable(true);
+                } else {
+                    grid[i][j].setText(Integer.toString(randomPuzzle[i][j]));
+                    grid[i][j].setEditable(false);
+                }
             }
         }
     }
 
-    private void startNewGame() {
-        // You can implement a logic to generate a new Sudoku puzzle here
-        // For simplicity, let's just clear the grid for now
-        clearGrid();
-    }
-
-    private void displayMessage(String message) {
-        Stage stage = new Stage();
-        stage.setTitle("Sudoku Game");
-        stage.setScene(new Scene(new HBox(10), 200, 100));
-        stage.show();
+    private int[][] generateRandomCompletedPuzzle() {
+        int[][] sudokuBoard = new int[9][9];
+        sudokuSolver.solveSudoku(sudokuBoard); // Generate a random completed puzzle
+        return sudokuBoard;
     }
 }
